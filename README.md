@@ -54,8 +54,8 @@ or
 `python DEC.py usps --update_interval 30`
 
 6. Run experiment on REUTERSIDF10K.   
-`python IDEC.py usps --n_clusters 4 --update_interval 20`   
-`python DEC.py usps --n_clusters 4 --update_interval 20`
+`python IDEC.py reutersidf10k --n_clusters 4 --update_interval 20`   
+`python DEC.py reutersidf10k --n_clusters 4 --update_interval 20`
 
 
 ## Models
