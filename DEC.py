@@ -10,7 +10,7 @@ Usage:
     No pretrained autoencoder weights available:
         python DEC.py mnist
         python DEC.py usps --update_interval 30
-        python DEC.py reutersidf10k --update_interval 20
+        python DEC.py reutersidf10k --n_clusters 4 --update_interval 20
     Weights of Pretrained autoencoder for mnist are in './ae_weights/mnist_ae_weights.h5':
         python DEC.py mnist --ae_weights ./ae_weights/mnist_ae_weights.h5
 
