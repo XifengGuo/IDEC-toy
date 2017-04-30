@@ -31,36 +31,36 @@ This code is used for quick start with DEC and IDEC algorithms. The results are 
 
 
 ## Usage
-1. Install [Keras v2.0](https://github.com/fchollet/keras), scikit-learn and git
-`sudo pip install keras scikit-learn`
+1. Install [Keras v2.0](https://github.com/fchollet/keras), scikit-learn and git   
+`sudo pip install keras scikit-learn`   
 `sudo apt-get install git`
-2. Clone the code to local.
+2. Clone the code to local.   
 `git clone https://github.com/XifengGuo/IDEC-toy.git`
-3. Prepare datasets. 
-`cd IDEC-toy`
-`bash ./data/usps/download_usps.sh`
+3. Prepare datasets.    
+`cd IDEC-toy`   
+`bash ./data/usps/download_usps.sh`   
 `bash ./data/reuters/get_data.sh`
     
-4. Run experiment on MNIST.
-`python IDEC.py mnist` or `python DEC.py mnist`
+4. Run experiment on MNIST.   
+`python IDEC.py mnist` or `python DEC.py mnist`   
 The pretrained autoencoder weights are saved to "ae_weights.h5" and the IDEC (or DEC) model is saved to "results/idec/IDEC_model_final.h5" (or "results/dec/DEC_model_final.h5").
-Then we can run IDEC algorithm or DEC with the trained autoencoder weights:
-`python IDEC.py mnist --ae_weights ae_weights.h5`
-or
+Then we can run IDEC algorithm or DEC with the trained autoencoder weights:   
+`python IDEC.py mnist --ae_weights ae_weights.h5`   
+or   
 `python DEC.py mnist --ae_weights ae_weights.h5`
 
-5. Run experiment on USPS.
-`python IDEC.py usps --update_interval 30`
+5. Run experiment on USPS.   
+`python IDEC.py usps --update_interval 30`   
 `python DEC.py usps --update_interval 30`
 
-6. Run experiment on REUTERSIDF10K.
-`python IDEC.py usps --n_clusters 4 --update_interval 20`
+6. Run experiment on REUTERSIDF10K.   
+`python IDEC.py usps --n_clusters 4 --update_interval 20`   
 `python DEC.py usps --n_clusters 4 --update_interval 20`
 
 
 ## Models
-The DEC model: 
+The DEC model:    
 ![sd](./dec_model.png "DEC model")
 
-The IDEC model: 
+The IDEC model:    
 ![](./idec_model.png 'IDEC model')
