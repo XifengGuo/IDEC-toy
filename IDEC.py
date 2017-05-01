@@ -88,20 +88,20 @@ class IDEC(object):
         weight = q ** 2 / q.sum(0)
         return (weight.T / weight.sum(1)).T
 
-    def clustering(self, X, y=None,
+    def clustering(self, x, y=None,
                    tol=1e-3,
                    update_interval=140,
                    maxiter=2e4,
                    save_dir='./results/idec'):
 
         print 'Update interval', update_interval
-        save_interval = X.shape[0] / self.batch_size * 5  # 5 epochs
+        save_interval = x.shape[0] / self.batch_size * 5  # 5 epochs
         print 'Save interval', save_interval
 
         # initialize cluster centers using k-means
         print 'Initializing cluster centers with k-means.'
         kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
-        y_pred = kmeans.fit_predict(self.encoder.predict(X))
+        y_pred = kmeans.fit_predict(self.encoder.predict(x))
         y_pred_last = y_pred
         self.model.get_layer(name='clustering').set_weights([kmeans.cluster_centers_])
 
@@ -117,7 +117,7 @@ class IDEC(object):
         index = 0
         for ite in range(int(maxiter)):
             if ite % update_interval == 0:
-                q, _ = self.model.predict(X, verbose=0)
+                q, _ = self.model.predict(x, verbose=0)
                 p = self.target_distribution(q)  # update the auxiliary target distribution p
 
                 # evaluate the clustering performance
@@ -141,14 +141,14 @@ class IDEC(object):
                     break
 
             # train on batch
-            if (index + 1) * self.batch_size > X.shape[0]:
-                loss = self.model.train_on_batch(x=X[index * self.batch_size::],
-                                                 y=[p[index * self.batch_size::], X[index * self.batch_size::]])
+            if (index + 1) * self.batch_size > x.shape[0]:
+                loss = self.model.train_on_batch(x=x[index * self.batch_size::],
+                                                 y=[p[index * self.batch_size::], x[index * self.batch_size::]])
                 index = 0
             else:
-                loss = self.model.train_on_batch(x=X[index * self.batch_size:(index + 1) * self.batch_size],
+                loss = self.model.train_on_batch(x=x[index * self.batch_size:(index + 1) * self.batch_size],
                                                  y=[p[index * self.batch_size:(index + 1) * self.batch_size],
-                                                    X[index * self.batch_size:(index + 1) * self.batch_size]])
+                                                    x[index * self.batch_size:(index + 1) * self.batch_size]])
                 index += 1
 
             # save intermediate model

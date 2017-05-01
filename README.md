@@ -35,11 +35,14 @@ This code is used for quick start with DEC and IDEC algorithms. The results are 
 `sudo pip install keras scikit-learn`   
 `sudo apt-get install git`
 2. Clone the code to local.   
-`git clone https://github.com/XifengGuo/IDEC-toy.git`
+`git clone https://github.com/XifengGuo/IDEC-toy.git IDEC-toy`
 3. Prepare datasets.    
-`cd IDEC-toy`   
-`bash ./data/usps/download_usps.sh`   
-`bash ./data/reuters/get_data.sh`
+
+        cd IDEC-toy/data/usps   
+        bash ./download_usps.sh   
+        cd ../reuters  
+        bash ./get_data.sh   
+        cd ../..
     
 4. Run experiment on MNIST.   
 `python IDEC.py mnist` or `python DEC.py mnist`   

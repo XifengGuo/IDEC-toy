@@ -23,8 +23,8 @@ import numpy as np
 import keras.backend as K
 from keras.engine.topology import Layer, InputSpec
 from keras.layers import Dense, Input
-from keras.models import Sequential, Model
-from keras.optimizers import SGD, Adam
+from keras.models import Model
+from keras.optimizers import SGD
 from keras.utils.vis_utils import plot_model
 
 from sklearn.cluster import KMeans
@@ -53,7 +53,7 @@ def cluster_acc(y_true, y_pred):
     return sum([w[i, j] for i, j in ind]) * 1.0 / y_pred.size
 
 
-def autoencoder(dims=[784, 500, 500, 2000, 10], act='relu'):
+def autoencoder(dims, act='relu'):
     """
     Fully connected auto-encoder model, symmetric.
     Arguments:
@@ -73,7 +73,7 @@ def autoencoder(dims=[784, 500, 500, 2000, 10], act='relu'):
         h = Dense(dims[i + 1], activation=act, name='encoder_%d' % i)(h)
 
     # hidden layer
-    h = Dense(dims[-1], name='encoder_%d' % (n_stacks - 1))(h)  # hidden or embedding layer, features are extracted from here
+    h = Dense(dims[-1], name='encoder_%d' % (n_stacks - 1))(h)  # hidden layer, features are extracted from here
 
     # internal layers in decoder
     for i in range(n_stacks-1, 0, -1):
