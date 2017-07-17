@@ -167,14 +167,15 @@ class DEC(object):
     def initialize_model(self, x, ae_weights=None, pretrain_epochs=400, optimizer='adam'):
         if ae_weights is not None:  # load pretrained weights of autoencoder
             self.autoencoder.load_weights(ae_weights)
-            print 'Pretrained AE weights are loaded successfully.'
+            print('Pretrained AE weights are loaded successfully.')
         else:  # initialize by greedy layer wise training
-            print 'No pretrained AE weights are loaded.'
-            print 'Pretraining...'
-            self.autoencoder.compile(optimizer=SGD(lr=0.01, momentum=0.9), loss='mse')
+            print('No pretrained AE weights are loaded.')
+            print('Pretraining...')
+            self.autoencoder.compile(optimizer='adam',#SGD(lr=0.01, momentum=0.9),
+                                     loss='mse')
             self.autoencoder.fit(x, x, batch_size=self.batch_size, epochs=pretrain_epochs)
             self.autoencoder.save_weights('ae_weights.h5')
-            print 'Pretrained weights are saved to ./ae_weights.h5'
+            print('Pretrained weights are saved to ./ae_weights.h5')
 
         hidden = self.autoencoder.get_layer(name='encoder_%d' % (self.n_stacks - 1)).output
         self.encoder = Model(inputs=self.autoencoder.input, outputs=hidden)
@@ -206,12 +207,12 @@ class DEC(object):
                    maxiter=2e4,
                    save_dir='./results/dec'):
 
-        print 'Update interval', update_interval
-        save_interval = x.shape[0] / self.batch_size * 5  # 5 epochs
-        print 'Save interval', save_interval
+        print('Update interval', update_interval)
+        save_interval = int(x.shape[0] / self.batch_size) * 5  # 5 epochs
+        print('Save interval', save_interval)
 
         # initialize cluster centers using k-means
-        print 'Initializing cluster centers with k-means.'
+        print('Initializing cluster centers with k-means.')
         kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
         y_pred = kmeans.fit_predict(self.encoder.predict(x))
         y_pred_last = y_pred
@@ -222,7 +223,7 @@ class DEC(object):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        logfile = file(save_dir + '/dec_log.csv', 'wb')
+        logfile = open(save_dir + '/dec_log.csv', 'w')
         logwriter = csv.DictWriter(logfile, fieldnames=['iter', 'acc', 'nmi', 'ari', 'L'])
         logwriter.writeheader()
 
@@ -244,12 +245,12 @@ class DEC(object):
                     loss = np.round(loss, 5)
                     logdict = dict(iter=ite, acc=acc, nmi=nmi, ari=ari, L=loss)
                     logwriter.writerow(logdict)
-                    print 'Iter', ite, ': Acc', acc, ', nmi', nmi, ', ari', ari, '; loss=', loss
+                    print('Iter', ite, ': Acc', acc, ', nmi', nmi, ', ari', ari, '; loss=', loss)
 
                 # check stop criterion
                 if ite > 0 and delta_label < tol:
-                    print 'delta_label ', delta_label, '< tol ', tol
-                    print 'Reached tolerance threshold. Stopping training.'
+                    print('delta_label ', delta_label, '< tol ', tol)
+                    print('Reached tolerance threshold. Stopping training.')
                     logfile.close()
                     break
 
@@ -266,14 +267,14 @@ class DEC(object):
             # save intermediate model
             if ite % save_interval == 0:
                 # save DEC model checkpoints
-                print 'saving model to:', save_dir + '/DEC_model_' + str(ite) + '.h5'
+                print('saving model to:', save_dir + '/DEC_model_' + str(ite) + '.h5')
                 self.model.save_weights(save_dir + '/DEC_model_' + str(ite) + '.h5')
 
             ite += 1
 
         # save the trained model
         logfile.close()
-        print 'saving model to:', save_dir + '/DEC_model_final.h5'
+        print('saving model to:', save_dir + '/DEC_model_final.h5')
         self.model.save_weights(save_dir + '/DEC_model_final.h5')
 
         return y_pred
@@ -285,38 +286,44 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='train',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('dataset', default='mnist', choices=['mnist', 'usps', 'reutersidf10k'])
+    parser.add_argument('dataset', default='mnist', choices=['mnist', 'usps', 'reutersidf10k', 'pendigits'])
     parser.add_argument('--n_clusters', default=10, type=int)
     parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--maxiter', default=2e4, type=int)
-    parser.add_argument('--pretrain_epochs', default=400, type=int)
+    parser.add_argument('--pretrain_epochs', default=200, type=int)
     parser.add_argument('--gamma', default=0.1, type=float,
                         help='coefficient of clustering loss')
-    parser.add_argument('--update_interval', default=140, type=int)
+    parser.add_argument('--update_interval', default=0, type=int)
     parser.add_argument('--tol', default=0.001, type=float)
     parser.add_argument('--ae_weights', default=None)
     parser.add_argument('--save_dir', default='results/dec')
     args = parser.parse_args()
-    print args
+    print(args)
 
     # load dataset
-    from datasets import load_mnist, load_reuters, load_usps
+    from datasets import load_mnist, load_reuters, load_usps, load_pendigits
     if args.dataset == 'mnist':  # recommends: n_clusters=10, update_interval=140
         x, y = load_mnist()
+        # x, y = x[60000:], y[60000:]  # test set
     elif args.dataset == 'usps':  # recommends: n_clusters=10, update_interval=30
         x, y = load_usps('data/usps')
+    elif args.dataset == 'pendigits':
+        x, y = load_pendigits('data/pendigits')
     elif args.dataset == 'reutersidf10k':  # recommends: n_clusters=4, update_interval=20
         x, y = load_reuters('data/reuters')
+
+    if args.update_interval == 0:  # one epoch. A smaller value may correspond to higher performance
+        args.update_interval = int(x.shape[0]/args.batch_size)
 
     # prepare the DEC model
     dec = DEC(dims=[x.shape[-1], 500, 500, 2000, 10], n_clusters=args.n_clusters, batch_size=args.batch_size)
 
     dec.initialize_model(x, ae_weights=args.ae_weights, pretrain_epochs=args.pretrain_epochs,
-                         optimizer=SGD(lr=0.01, momentum=0.9))
+                         optimizer='adam')#SGD(lr=0.01, momentum=0.9))
     plot_model(dec.model, to_file='dec_model.png', show_shapes=True)
     dec.model.summary()
     t0 = time()
     y_pred = dec.clustering(x, y=y, tol=args.tol, maxiter=args.maxiter,
                             update_interval=args.update_interval, save_dir=args.save_dir)
-    print 'acc:', cluster_acc(y, y_pred)
-    print 'clustering time: ', (time() - t0)
+    print('acc:', cluster_acc(y, y_pred))
+    print('clustering time: ', (time() - t0))
