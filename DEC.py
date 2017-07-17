@@ -9,8 +9,8 @@ Main differences with original code at https://github.com/piiswrong/dec.git:
 Usage:
     No pretrained autoencoder weights available:
         python DEC.py mnist
-        python DEC.py usps --update_interval 30
-        python DEC.py reutersidf10k --n_clusters 4 --update_interval 20
+        python DEC.py usps
+        python DEC.py reutersidf10k --n_clusters 4
     Weights of Pretrained autoencoder for mnist are in './ae_weights/mnist_ae_weights.h5':
         python DEC.py mnist --ae_weights ./ae_weights/mnist_ae_weights.h5
 
@@ -150,8 +150,7 @@ class DEC(object):
     def __init__(self,
                  dims,
                  n_clusters=10,
-                 alpha=1.0,
-                 batch_size=256):
+                 alpha=1.0):
 
         super(DEC, self).__init__()
 
@@ -161,36 +160,31 @@ class DEC(object):
 
         self.n_clusters = n_clusters
         self.alpha = alpha
-        self.batch_size = batch_size
         self.autoencoder = autoencoder(self.dims)
-
-    def initialize_model(self, x, ae_weights=None, pretrain_epochs=400, optimizer='adam'):
-        if ae_weights is not None:  # load pretrained weights of autoencoder
-            self.autoencoder.load_weights(ae_weights)
-            print('Pretrained AE weights are loaded successfully.')
-        else:  # initialize by greedy layer wise training
-            print('No pretrained AE weights are loaded.')
-            print('Pretraining...')
-            self.autoencoder.compile(optimizer='adam',#SGD(lr=0.01, momentum=0.9),
-                                     loss='mse')
-            self.autoencoder.fit(x, x, batch_size=self.batch_size, epochs=pretrain_epochs)
-            self.autoencoder.save_weights('ae_weights.h5')
-            print('Pretrained weights are saved to ./ae_weights.h5')
-
         hidden = self.autoencoder.get_layer(name='encoder_%d' % (self.n_stacks - 1)).output
         self.encoder = Model(inputs=self.autoencoder.input, outputs=hidden)
 
         # prepare DEC model
-        clustering_layer = ClusteringLayer(self.n_clusters, name='clustering')(hidden)
+        clustering_layer = ClusteringLayer(self.n_clusters, alpha=self.alpha, name='clustering')(hidden)
         self.model = Model(inputs=self.autoencoder.input, outputs=clustering_layer)
-        self.model.compile(loss='kld', optimizer=optimizer)
+
+        self.pretrained = False
+        self.centers = []
+        self.y_pred = []
+
+    def pretrain(self, x, batch_size=256, epochs=200, optimizer='adam'):
+        print('...Pretraining...')
+        self.autoencoder.compile(loss='mse', optimizer=optimizer)  # SGD(lr=0.01, momentum=0.9),
+        self.autoencoder.fit(x, x, batch_size=batch_size, epochs=epochs)
+        self.autoencoder.save_weights('ae_weights.h5')
+        print('Pretrained weights are saved to ./ae_weights.h5')
+        self.pretrained = True
 
     def load_weights(self, weights_path):  # load weights of DEC model
         self.model.load_weights(weights_path)
 
     def extract_feature(self, x):  # extract features from before clustering layer
-        encoder = Model(self.model.input, self.model.get_layer('encoder_%d' % (self.n_stacks - 1)).output)
-        return encoder.predict(x)
+        return self.encoder.predict(x)
 
     def predict_clusters(self, x):  # predict cluster labels using the output of clustering layer
         q = self.model.predict(x, verbose=0)
@@ -201,28 +195,38 @@ class DEC(object):
         weight = q ** 2 / q.sum(0)
         return (weight.T / weight.sum(1)).T
 
-    def clustering(self, x, y=None,
-                   tol=1e-4,
-                   update_interval=140,
-                   maxiter=2e4,
-                   save_dir='./results/dec'):
+    def compile(self, loss='kld', optimizer='adam'):
+        self.model.compile(loss=loss, optimizer=optimizer)
+
+    def fit(self, x, y=None, batch_size=256, maxiter=2e4, tol=1e-3, update_interval=140,
+            ae_weights=None, save_dir='./results/dec'):
 
         print('Update interval', update_interval)
-        save_interval = int(x.shape[0] / self.batch_size) * 5  # 5 epochs
+        save_interval = int(x.shape[0] / batch_size) * 5  # 5 epochs
         print('Save interval', save_interval)
 
-        # initialize cluster centers using k-means
+        # Step 1: pretrain
+        if not self.pretrained and ae_weights is None:
+            print('...pretraining autoencoders using default hyper-parameters:')
+            print('   optimizer=\'adam\';   epochs=200')
+            self.pretrain(x, batch_size)
+            self.pretrained = True
+        elif ae_weights is not None:
+            self.autoencoder.load_weights(ae_weights)
+            print('ae_weights is loaded successfully.')
+
+        # Step 2: initialize cluster centers using k-means
         print('Initializing cluster centers with k-means.')
         kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
-        y_pred = kmeans.fit_predict(self.encoder.predict(x))
-        y_pred_last = y_pred
+        self.y_pred = kmeans.fit_predict(self.encoder.predict(x))
+        y_pred_last = np.copy(self.y_pred)
         self.model.get_layer(name='clustering').set_weights([kmeans.cluster_centers_])
 
+        # Step 3: deep clustering
         # logging file
         import csv, os
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-
         logfile = open(save_dir + '/dec_log.csv', 'w')
         logwriter = csv.DictWriter(logfile, fieldnames=['iter', 'acc', 'nmi', 'ari', 'L'])
         logwriter.writeheader()
@@ -235,19 +239,19 @@ class DEC(object):
                 p = self.target_distribution(q)  # update the auxiliary target distribution p
 
                 # evaluate the clustering performance
-                y_pred = q.argmax(1)
-                delta_label = np.sum(y_pred != y_pred_last).astype(np.float32) / y_pred.shape[0]
-                y_pred_last = y_pred
+                self.y_pred = q.argmax(1)
                 if y is not None:
-                    acc = np.round(cluster_acc(y, y_pred), 5)
-                    nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-                    ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
+                    acc = np.round(cluster_acc(y, self.y_pred), 5)
+                    nmi = np.round(metrics.normalized_mutual_info_score(y, self.y_pred), 5)
+                    ari = np.round(metrics.adjusted_rand_score(y, self.y_pred), 5)
                     loss = np.round(loss, 5)
-                    logdict = dict(iter=ite, acc=acc, nmi=nmi, ari=ari, L=loss)
-                    logwriter.writerow(logdict)
-                    print('Iter', ite, ': Acc', acc, ', nmi', nmi, ', ari', ari, '; loss=', loss)
+                    logwriter.writerow(dict(iter=ite, acc=acc, nmi=nmi, ari=ari, L=loss))
+                    print('Iter-%d: ACC= %.4f, NMI= %.4f, ARI= %.4f;  L= %.5f'
+                          % (ite, acc, nmi, ari, loss))
 
                 # check stop criterion
+                delta_label = np.sum(self.y_pred != y_pred_last).astype(np.float32) / self.y_pred.shape[0]
+                y_pred_last = np.copy(self.y_pred)
                 if ite > 0 and delta_label < tol:
                     print('delta_label ', delta_label, '< tol ', tol)
                     print('Reached tolerance threshold. Stopping training.')
@@ -255,32 +259,33 @@ class DEC(object):
                     break
 
             # train on batch
-            if (index + 1) * self.batch_size > x.shape[0]:
-                loss = self.model.train_on_batch(x=x[index * self.batch_size::],
-                                                 y=p[index * self.batch_size::])
+            if (index + 1) * batch_size > x.shape[0]:
+                loss = self.model.train_on_batch(x=x[index * batch_size::],
+                                                 y=p[index * batch_size::])
                 index = 0
             else:
-                loss = self.model.train_on_batch(x=x[index * self.batch_size:(index + 1) * self.batch_size],
-                                                 y=p[index * self.batch_size:(index + 1) * self.batch_size])
+                loss = self.model.train_on_batch(x=x[index * batch_size:(index + 1) * batch_size],
+                                                 y=p[index * batch_size:(index + 1) * batch_size])
                 index += 1
 
             # save intermediate model
             if ite % save_interval == 0:
                 # save DEC model checkpoints
-                print('saving model to:', save_dir + '/DEC_model_' + str(ite) + '.h5')
+                print('saving model to: ' + save_dir + '/DEC_model_' + str(ite) + '.h5')
                 self.model.save_weights(save_dir + '/DEC_model_' + str(ite) + '.h5')
 
             ite += 1
 
         # save the trained model
         logfile.close()
-        print('saving model to:', save_dir + '/DEC_model_final.h5')
+        print('saving model to: ' + save_dir + '/DEC_model_final.h5')
         self.model.save_weights(save_dir + '/DEC_model_final.h5')
 
-        return y_pred
+        return self.y_pred
 
 
 if __name__ == "__main__":
+
     # setting the hyper parameters
     import argparse
 
@@ -301,10 +306,11 @@ if __name__ == "__main__":
     print(args)
 
     # load dataset
+    optimizer = 'adam'  # SGD(lr=0.01, momentum=0.99)
     from datasets import load_mnist, load_reuters, load_usps, load_pendigits
+
     if args.dataset == 'mnist':  # recommends: n_clusters=10, update_interval=140
         x, y = load_mnist()
-        # x, y = x[60000:], y[60000:]  # test set
     elif args.dataset == 'usps':  # recommends: n_clusters=10, update_interval=30
         x, y = load_usps('data/usps')
     elif args.dataset == 'pendigits':
@@ -315,15 +321,25 @@ if __name__ == "__main__":
     if args.update_interval == 0:  # one epoch. A smaller value may correspond to higher performance
         args.update_interval = int(x.shape[0]/args.batch_size)
 
-    # prepare the DEC model
-    dec = DEC(dims=[x.shape[-1], 500, 500, 2000, 10], n_clusters=args.n_clusters, batch_size=args.batch_size)
-
-    dec.initialize_model(x, ae_weights=args.ae_weights, pretrain_epochs=args.pretrain_epochs,
-                         optimizer='adam')#SGD(lr=0.01, momentum=0.9))
+    # Define DEC model
+    dec = DEC(dims=[x.shape[-1], 500, 500, 2000, 10], n_clusters=args.n_clusters)
     plot_model(dec.model, to_file='dec_model.png', show_shapes=True)
     dec.model.summary()
+
     t0 = time()
-    y_pred = dec.clustering(x, y=y, tol=args.tol, maxiter=args.maxiter,
-                            update_interval=args.update_interval, save_dir=args.save_dir)
+
+    # Pretrain autoencoders before clustering
+    if args.ae_weights is None:
+        dec.pretrain(x, batch_size=args.batch_size, epochs=args.pretrain_epochs, optimizer=optimizer)
+
+    # begin clustering, time not include pretraining part.
+
+    dec.compile(loss='kld', optimizer=optimizer)
+    dec.fit(x, y=y, batch_size=args.batch_size, tol=args.tol, maxiter=args.maxiter,
+            update_interval=args.update_interval, ae_weights=args.ae_weights, save_dir=args.save_dir)
+
+    # Show the final results
+    y_pred = dec.y_pred
     print('acc:', cluster_acc(y, y_pred))
-    print('clustering time: ', (time() - t0))
+    print('clustering time: %d seconds.' % int(time() - t0))
+

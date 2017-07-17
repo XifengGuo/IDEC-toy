@@ -9,7 +9,8 @@ and re-implementation (not exactly for pre-training part) for paper:
 
 * Junyuan Xie, Ross Girshick, and Ali Farhadi. Unsupervised deep embedding for clustering analysis. ICML 2016.
 
-This code is used for quick start with DEC and IDEC algorithms. The results are not same with that reported in our paper. Use [IDEC code](https://github.com/XifengGuo/IDEC) to exactly re-implement the experiments.
+This code is used for quick start with DEC and IDEC algorithms. 
+The results are not same with that reported in our paper. Use [IDEC code](https://github.com/XifengGuo/IDEC) to exactly re-implement the experiments.
    
 
 ## Differences with IDEC implementation used in paper
@@ -20,17 +21,18 @@ This code is used for quick start with DEC and IDEC algorithms. The results are 
 
     Table 1. Results of methods implemented by this code and [IDEC code](https://github.com/XifengGuo/IDEC), measured by Accuracy (%)
     
-    Methods     |     MNIST   |   USPS   |   REUTERSIDF10K
-    :-----------|:-----------:|:--------:|:--------------:
-    AE+KMeans   |  79.5       |  62.3    |  48.1
-    DEC         |  84.5       |  71.0    |  50.3
-    IDEC        |  87.5       |  72.7    |  51.7
-    AE+KMeans(paper)| 81.8    |  69.3    |  70.5
-    DEC(paper)  |  86.6       |  74.1    |  73.7
-    IDEC(paper) |  88.1       |  76.1    |  75.6
+    Methods     |     MNIST   |   USPS   |   REUTERSIDF10K |  pendigits
+    :-----------|:-----------:|:--------:|:--------------: |:-----------:
+    AE+KMeans   |  82.9       |  69.0    |  54.2           |  68.6
+    DEC         |  85.2       |  75.0    |  55.0           |  68.8
+    IDEC        |  87.3       |  76.3    |  56.3           |  69.8
+    AE+KMeans(paper)| 81.8    |  69.3    |  70.5           |  None
+    DEC(paper)  |  86.6       |  74.1    |  73.7           |  None
+    IDEC(paper) |  88.1       |  76.1    |  75.6           |  None
 
 
 ## Usage
+The code is compatible with Python 2.7 and Python 3.6.
 1. Install [Keras v2.0](https://github.com/fchollet/keras), scikit-learn and git   
 `sudo pip install keras scikit-learn`   
 `sudo apt-get install git`
@@ -40,6 +42,8 @@ This code is used for quick start with DEC and IDEC algorithms. The results are 
 
         cd IDEC-toy/data/usps   
         bash ./download_usps.sh   
+        cd ../pendigits   
+        bash ./download_pendigits.sh   
         cd ../reuters  
         bash ./get_data.sh   
         cd ../..
@@ -53,17 +57,13 @@ or
 `python DEC.py mnist --ae_weights ae_weights.h5`
 
 5. Run experiment on USPS.   
-`python IDEC.py usps --update_interval 30`   
-`python DEC.py usps --update_interval 30`
+`python IDEC.py usps`   
+`python DEC.py usps`
+
+5. Run experiment on pendigits.   
+`python IDEC.py pendigits`   
+`python DEC.py pendigits`
 
 6. Run experiment on REUTERSIDF10K.   
-`python IDEC.py reutersidf10k --n_clusters 4 --update_interval 20`   
-`python DEC.py reutersidf10k --n_clusters 4 --update_interval 20`
-
-
-## Models
-The DEC model:    
-![sd](./dec_model.png "DEC model")
-
-The IDEC model:    
-![](./idec_model.png 'IDEC model')
+`python IDEC.py reutersidf10k --n_clusters 4`   
+`python DEC.py reutersidf10k --n_clusters 4`

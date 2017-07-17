@@ -10,8 +10,8 @@ different with what reported in the paper.
 Usage:
     No pretrained autoencoder weights available:
         python IDEC.py mnist
-        python IDEC.py usps --update_interval 30
-        python IDEC.py reutersidf10k --n_clusters 4 --update_interval 20
+        python IDEC.py usps
+        python IDEC.py reutersidf10k --n_clusters 4
     Weights of Pretrained autoencoder for mnist are in './ae_weights/mnist_ae_weights.h5':
         python IDEC.py mnist --ae_weights ./ae_weights/mnist_ae_weights.h5
 

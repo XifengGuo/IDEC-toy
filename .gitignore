@@ -1,11 +1,14 @@
 # ignore auto generated (by pycharm) folder '.idea/'
 .idea/
-
+*.bak
+*.png
 # ignore data set
 /data/usps/*
 !/data/usps/download_usps.sh
 /data/reuters/*
 !/data/reuters/get_data.sh
+/data/pendigits/*
+!/data/pendigits/download_pendigits.sh
 
 # weights file
 /ae_weights/
